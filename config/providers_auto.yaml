@@ -1,0 +1,33 @@
+# ============================================================
+# ARCHIVO 100% GENERADO AUTOMÁTICAMENTE por src/discover.py
+# NO EDITAR A MANO -- los cambios se pierden en la próxima corrida.
+# Para agregar/quitar proveedores de aquí, edita config/candidates.txt
+# y vuelve a correr: python -m src.discover
+# ============================================================
+
+providers:
+- code: auto_globalmatik
+  name: globalmatik.com
+  sector: sin_clasificar_auto_descubierto
+  base_url: https://globalmatik.com
+  active: true
+  adapter: woocommerce
+  notes: Auto-descubierto por src/discover.py. Revisa el sector y el nombre, y ajústalos
+    a mano en config/providers.yaml si quieres 'adoptarlo' como entrada curada (opcional).
+- code: auto_tecnologiamayorista
+  name: www.tecnologiamayorista.com
+  sector: sin_clasificar_auto_descubierto
+  base_url: https://www.tecnologiamayorista.com
+  active: true
+  adapter: shopify
+  notes: Auto-descubierto por src/discover.py. Revisa el sector y el nombre, y ajústalos
+    a mano en config/providers.yaml si quieres 'adoptarlo' como entrada curada (opcional).
+  currency: COP
+- code: auto_soelco
+  name: soelco.co
+  sector: sin_clasificar_auto_descubierto
+  base_url: https://soelco.co
+  active: true
+  adapter: woocommerce
+  notes: Auto-descubierto por src/discover.py. Revisa el sector y el nombre, y ajústalos
+    a mano en config/providers.yaml si quieres 'adoptarlo' como entrada curada (opcional).

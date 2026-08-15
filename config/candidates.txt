@@ -1,0 +1,66 @@
+# ============================================================================
+# LISTA DE CANDIDATOS A PROVEEDOR — este es el único archivo que hay que
+# tocar para intentar sumar un proveedor nuevo. NO requiere programar nada.
+#
+# Formato: un dominio por línea (sin "https://", sin rutas), opcionalmente
+# con un comentario después de # indicando el sector.
+#
+# Cómo se usa:
+#   1. Agrega el dominio de la tienda del proveedor nuevo aquí abajo.
+#   2. Corre:  python -m src.discover
+#   3. El sistema prueba automáticamente si es una tienda Shopify o
+#      WooCommerce (las dos plataformas más comunes en este sector en
+#      Colombia). Si lo es, se auto-registra en config/providers_auto.yaml
+#      con moneda detectada y queda activo para la próxima corrida diaria
+#      — SIN que nadie tenga que escribir código ni YAML a mano.
+#   4. Si el dominio no es Shopify ni WooCommerce, discover.py lo deja
+#      anotado como "sin clasificar" en el reporte — esos sí necesitan
+#      investigación manual (selectores CSS o una API a medida), igual
+#      que se hizo con GVS, SYSCOM, SAT Store, etc.
+#
+# Puedes correr esto las veces que quieras; no duplica proveedores ya
+# registrados (se identifican por dominio).
+# ============================================================================
+
+# --- Candidatos ya confirmados como Shopify/WooCommerce en sesiones previas
+# (quedan aquí para que discover.py los pueda re-verificar automáticamente
+# si algún día cambian de plataforma o moneda)
+securitysolution.shop
+tiendamarwa.com.co
+energiteltelecom.com
+gsp.com.co
+hikvisiondistribuidor.com
+assecurity.com.co
+qualityandprice.co
+grupocontrol.co
+energitiendaups.com
+shop.fireline.com.co
+shingenieria.com
+domocol.com.co
+crccomunicaciones.com
+sumitelco.com
+vta.co                  # VTEX — activo, ver config/providers.yaml (code: vta)
+www.steren.com.co       # Magento (css) — activo, ver config/providers.yaml (code: steren)
+servisistemas.com.co    # PrestaShop (css) — activo, ver config/providers.yaml (code: servisistemas)
+bioentrada.com          # Wix Stores — activo, ver config/providers.yaml (code: bioentrada, adapter: wix_stores)
+globalmatik.com         # WooCommerce — activo vía providers_auto.yaml
+www.tecnologiamayorista.com   # Shopify — activo vía providers_auto.yaml
+soelco.co               # WooCommerce — activo vía providers_auto.yaml
+
+# --- Investigados y descartados (no viables para scraping automático;
+# detalle del motivo en config/providers.yaml, sección "CANDIDATOS
+# DESCARTADOS"). Se dejan aquí para que discover.py los pueda
+# re-verificar solo si algún día cambian de plataforma.
+ecomshops.com.co        # WordPress sin WooCommerce activo, sin precios públicos
+mercaelectronico.com    # PrestaShop con login obligatorio para ver precios (dominio correcto, sin "tienda.")
+telavip.com.co          # WordPress sin WooCommerce activo, sin precios públicos
+fichetcolombia.com      # Wix, pero sin Wix Stores instalado (solo landing institucional)
+colombiagps.com.co      # falso positivo WooCommerce (solo CSS del theme), modelo solo-cotización
+rastreadoresgpscolombia.com.co   # falso positivo WooCommerce, modelo solo-cotización
+zktecocolombia.com      # falso positivo WooCommerce, modelo solo-cotización
+vzlatam.com             # dominio no resuelve (NXDOMAIN), descartado
+batterypower.com.co     # WordPress sin WooCommerce activo, sin precios públicos
+
+# --- Adaptador Wix Stores (src/adapters/wix_stores.py): si aparece un
+# proveedor nuevo en Wix, solo agrega su dominio aquí y corre
+# "python -m src.discover" -- se detecta y activa solo, sin código nuevo.

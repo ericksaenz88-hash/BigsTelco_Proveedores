@@ -1,0 +1,560 @@
+# ============================================================================
+# MATRIZ DE PROVEEDORES
+#
+# Esta es la lista viva de proveedores a monitorear — proveedores grandes y
+# pequeños conviven aquí. Para agregar uno nuevo cuando aparezca en el
+# mercado, se agrega un bloque más abajo; el orquestador (src/main.py) los
+# recorre a todos automáticamente, sin que haya que tocar código.
+#
+# Cada proveedor declara un "adapter" (cómo se le habla):
+#
+#   - adapter: css
+#       Para sitios que renderizan el catálogo en el servidor (no usan
+#       JavaScript para mostrar productos). Se configuran "selectors" CSS.
+#       Es el camino por defecto para proveedores nuevos y pequeños.
+#
+#   - adapter: gvs_api / syscom_algolia
+#       Adaptadores a medida para proveedores grandes que sí requieren
+#       JavaScript en el navegador, pero cuya API interna se identificó y
+#       se puede consumir directamente (más rápido y estable que un
+#       navegador headless). Ver src/adapters/gvs_api.py y
+#       src/adapters/syscom_algolia.py para el detalle de cómo se
+#       encontraron y qué hacen.
+#
+# Cómo añadir un proveedor nuevo (caso típico, sitio simple):
+#   1. Abre la página de listado de productos en el navegador.
+#   2. Con "Inspeccionar elemento" identifica los selectores CSS.
+#   3. Copia un bloque de "adapter: css" abajo y ajusta selectors/categories.
+#   4. Prueba: python -m src.main --provider tu_codigo --dry-run
+#   5. Si funciona, pon active: true.
+#
+# Cómo añadir un proveedor grande con su propia API/JS (caso GVS/SYSCOM):
+#   1. Investiga con las herramientas de red del navegador (pestaña
+#      Network) qué llamadas hace el sitio para cargar productos.
+#   2. Si encuentras una API JSON pública (search-only key, REST, etc.),
+#      escribe un adaptador nuevo en src/adapters/tu_proveedor.py con una
+#      función fetch(provider_cfg) -> list[ScrapedProduct].
+#   3. Regístralo en src/adapters/__init__.py (diccionario ADAPTERS).
+#   4. Agrega el bloque aquí con adapter: tu_proveedor.
+#
+# IMPORTANTE: revisa siempre los Términos de Uso / robots.txt del sitio
+# antes de activar el scraping automático (ver README, "Aspectos legales").
+# ============================================================================
+
+providers:
+
+  # --------------------------------------------------------------------
+  # PROVEEDORES GRANDES (adaptadores a medida, API interna)
+  # --------------------------------------------------------------------
+
+  - code: gvs
+    name: "GVS Colombia"
+    sector: "seguridad_electronica_cableado_redes"
+    base_url: "https://www.gvscolombia.com"
+    active: true
+    adapter: gvs_api
+    notes: >
+      Catálogo completo (todas las líneas: CCTV, Cableado, Control de
+      Acceso, Redes, etc.) vía la API interna de GVS. Se auto-descubre la
+      lista de líneas en cada corrida (POST /lineasv2), así que categorías
+      nuevas que GVS agregue se recogen automáticamente sin editar este
+      archivo. Precio usado: PrecioFinal (incluye descuentos vigentes).
+
+  - code: syscom
+    name: "SYSCOM Colombia"
+    sector: "seguridad_electronica_cableado_redes_radiocomunicacion"
+    base_url: "https://www.syscomcolombia.com"
+    active: true
+    adapter: syscom_algolia
+    notes: >
+      Catálogo completo vía la API pública de búsqueda (Algolia) que usa
+      el sitio. Se auto-descubren las categorías de primer nivel
+      (facet menu_1: Cableado Estructurado, Videovigilancia, Redes,
+      Radiocomunicación, Energía, etc.) en cada corrida. Solo se guardan
+      productos con mostrar_precio=true (los que el sitio expone sin
+      necesidad de iniciar sesión).
+
+  # --------------------------------------------------------------------
+  # PROVEEDORES PEQUEÑOS / MEDIANOS (selectores CSS, sitio server-rendered)
+  # --------------------------------------------------------------------
+
+  - code: satstore
+    name: "SAT Store"
+    sector: "seguridad_electronica_cableado"
+    base_url: "https://satstore.com.co"
+    active: true
+    adapter: css
+    rate_limit_seconds: 2
+    categories:
+      - name: "Cableado Estructurado"
+        start_url: "https://satstore.com.co/esp/cableado-y-conectividad/cableado-estructurado.html"
+      - name: "Video Porteros"
+        start_url: "https://satstore.com.co/esp/seguridad-electronica/video-porteros.html"
+        # nota: "camaras-cctv.html" (categoría raíz) devuelve 404, hay que usar
+        # subcategorías puntuales, ej. .../camaras-cctv/analogas-4-en-1.html
+      - name: "Control de Acceso"
+        start_url: "https://satstore.com.co/esp/seguridad-electronica/controles-de-acceso-y-asistencia.html"
+        # ruta confirmada: /seguridad-electronica/controles-de-acceso-y-asistencia.html
+    selectors:
+      product_card: "li.item.product.product-item"
+      name: ".product-item-link"
+      sku: ".product-item-link"
+      price: ".price-box .price"
+      stock_out_of_stock_text: "Sin stock"
+      product_url: ".product-item-link"
+      next_page: "a.action.next"
+    notes: >
+      Sitio Magento, renderiza el catálogo del lado del servidor.
+      Precios en COP incluidos directamente en el HTML. Probado y
+      funcionando (41 productos extraídos en la prueba inicial).
+
+  - code: izc
+    name: "IZC Mayorista"
+    sector: "cableado_redes"
+    base_url: "https://izc.com.co"
+    active: true
+    adapter: css
+    rate_limit_seconds: 2
+    categories:
+      - name: "Cableado y Conectividad"
+        start_url: "https://izc.com.co/es/cableado-y-conectividad.html"
+    selectors:
+      product_card: "li.item.product.product-item"
+      name: ".product-item-link"
+      sku: ".product-item-link"
+      price: ".price-box .price"
+      stock_out_of_stock_text: "Sin stock"
+      product_url: ".product-item-link"
+      next_page: "a.action.next"
+    notes: >
+      Plataforma Magento, misma estructura que SAT Store. Precios en COP
+      visibles directamente en el HTML.
+
+  - code: marwa
+    name: "MARWA (tiendamarwa.com.co)"
+    sector: "cableado_redes_energia"
+    base_url: "https://tiendamarwa.com.co"
+    active: true
+    adapter: woocommerce
+    notes: >
+      El sitio institucional (marwa.com.co) es solo informativo; la tienda
+      real está en tiendamarwa.com.co (WordPress + WooCommerce). Usa la
+      Store API pública de WooCommerce, que confirma moneda COP de forma
+      explícita en cada respuesta (sin ambigüedad, a diferencia de SYSCOM).
+
+  - code: security_solution_shop
+    name: "Security Solution Shop"
+    sector: "seguridad_electronica_redes"
+    base_url: "https://securitysolution.shop"
+    active: true
+    adapter: shopify
+    currency: "USD"
+    notes: >
+      Tienda Shopify. IMPORTANTE: esta tienda factura en USD (confirmado:
+      Shopify.currency.active = "USD" en el propio sitio), no en COP —
+      a diferencia de la mayoría de proveedores de esta matriz. Los precios
+      quedan guardados en dólares; conviértelos con la TRM del día antes
+      de usarlos en una cotización en pesos.
+
+  # --------------------------------------------------------------------
+  # PROVEEDORES ADICIONALES (WooCommerce / Shopify — detectados y
+  # confirmados en la segunda ronda de investigación, moneda verificada
+  # explícitamente en cada uno antes de activarlos)
+  # --------------------------------------------------------------------
+
+  - code: energitel
+    name: "Energitel Telco"
+    sector: "telecomunicaciones_fibra_optica_fttx"
+    base_url: "https://energiteltelecom.com"
+    active: true
+    adapter: woocommerce
+    notes: >
+      WordPress + WooCommerce, moneda COP confirmada explícitamente por la
+      Store API. Especializados en fibra óptica y equipos FTTx. Varios
+      productos devuelven precio 0 (probablemente requieren cotización con
+      el proveedor); el adaptador los guarda como "sin precio" (None), no
+      como cero.
+
+  - code: gsp
+    name: "GSP (Global Security Protection)"
+    sector: "seguridad_electronica_hikvision"
+    base_url: "https://gsp.com.co"
+    active: true
+    adapter: woocommerce
+    notes: >
+      Distribuidor mayorista autorizado Hikvision, WooCommerce, moneda COP
+      confirmada. Bodegas en 8 ciudades.
+
+  - code: equiredes
+    name: "Equiredes (Hikvision Distribuidor)"
+    sector: "seguridad_electronica_hikvision"
+    base_url: "https://hikvisiondistribuidor.com"
+    active: true
+    adapter: woocommerce
+    notes: "Distribuidor autorizado Hikvision, WooCommerce, moneda COP confirmada."
+
+  - code: assecurity
+    name: "AS Security"
+    sector: "seguridad_electronica_hikvision"
+    base_url: "https://assecurity.com.co"
+    active: true
+    adapter: shopify
+    currency: "COP"
+    notes: >
+      Distribuidor autorizado Hikvision, tienda Shopify. No se pudo
+      confirmar el flag Shopify.currency directamente (la home no lo
+      expone igual que otras tiendas), pero la magnitud de los precios
+      devueltos (ej. $180.000, $6.000.000) es consistente con COP para
+      este tipo de producto. Si algún precio se ve claramente fuera de
+      rango al revisar, avisa para re-verificar.
+
+  - code: qualityandprice
+    name: "Quality and Price Colombia"
+    sector: "radiocomunicacion_motorola_hytera_kenwood"
+    base_url: "https://qualityandprice.co"
+    active: true
+    adapter: shopify
+    currency: "COP"
+    notes: >
+      Distribuidor autorizado Motorola/Hytera/Kenwood/Spot/Garmin, tienda
+      Shopify. Moneda COP confirmada (Shopify.currency.active = "COP").
+
+  - code: grupocontrol
+    name: "Grupo Control"
+    sector: "control_de_acceso_biometria"
+    base_url: "https://grupocontrol.co"
+    active: true
+    adapter: shopify
+    currency: "COP"
+    notes: "Tienda Shopify especializada en control de acceso/biometría. Moneda COP confirmada."
+
+  - code: energitiendaups
+    name: "Energi Tienda UPS"
+    sector: "energia_ups_baterias"
+    base_url: "https://energitiendaups.com"
+    active: true
+    adapter: woocommerce
+    notes: "WordPress + WooCommerce, moneda COP confirmada. UPS, baterías, paneles solares."
+
+  - code: fireline
+    name: "Fireline Shop"
+    sector: "deteccion_incendios_seguridad_industrial"
+    base_url: "https://shop.fireline.com.co"
+    active: true
+    adapter: shopify
+    currency: "COP"
+    notes: "Tienda Shopify de detección/protección contra incendios y seguridad industrial. Moneda COP confirmada."
+
+  - code: shingenieria
+    name: "SH Ingeniería"
+    sector: "deteccion_incendios_seguridad_electronica"
+    base_url: "https://shingenieria.com"
+    active: true
+    adapter: woocommerce
+    notes: "WordPress + WooCommerce, moneda COP confirmada. Detección de incendios y seguridad electrónica."
+
+  - code: domocol
+    name: "Domocol"
+    sector: "domotica_automatizacion_energia"
+    base_url: "https://domocol.com.co"
+    active: true
+    adapter: woocommerce
+    notes: >
+      WordPress + WooCommerce, moneda COP confirmada. Domótica,
+      automatización (Control4) y energía de respaldo.
+
+  # --------------------------------------------------------------------
+  # PROVEEDORES ADICIONALES (tercera ronda — investigación de los 13
+  # candidatos "sin clasificar" de candidates.txt)
+  # --------------------------------------------------------------------
+
+  - code: vta
+    name: "VTA (vta.co)"
+    sector: "seguridad_electronica_cableado_redes"
+    base_url: "https://www.vta.co"
+    active: true
+    adapter: vtex
+    currency: "COP"
+    notes: >
+      Tienda VTEX (plataforma usada por retailers grandes en LatAm). API
+      pública de catálogo confirmada y funcionando (393 productos en la
+      prueba: /api/catalog_system/pub/products/search). IMPORTANTE: a
+      diferencia de Shopify/WooCommerce, la API de VTEX no devuelve el
+      código de moneda explícitamente; se asume COP por el mercado del
+      sitio (dominio .co, precios visibles en el navegador en pesos), pero
+      no está confirmada por un campo explícito de la API — misma
+      precaución que con SYSCOM. Ver src/adapters/vtex.py.
+
+  - code: steren
+    name: "Steren Colombia"
+    sector: "seguridad_electronica_cableado_electronica_general"
+    base_url: "https://www.steren.com.co"
+    active: true
+    adapter: css
+    rate_limit_seconds: 2
+    categories:
+      - name: "Video Porteros e Intercomunicadores"
+        start_url: "https://www.steren.com.co/casa-y-oficina/video-porteros-e-intercomunicadores"
+      # nota: la categoría raíz de CCTV no se probó igual que en SAT
+      # Store/IZC; si da 404, usar subcategorías puntuales igual que allá.
+    selectors:
+      product_card: "li.item.product.product-item"
+      name: ".product-item-link"
+      sku: ".product-item-sku"
+      price: ".price-box.price-final_price .price"
+      stock_out_of_stock_text: "Sin stock"
+      product_url: ".product-item-link"
+      next_page: "a.action.next"
+    notes: >
+      Plataforma Magento, misma estructura que SAT Store/IZC. Precios COP
+      visibles directamente en el HTML sin necesidad de login. A diferencia
+      de SAT/IZC, expone el SKU en un elemento propio (.product-item-sku)
+      en vez de tener que extraerlo del texto del link.
+
+  - code: bioentrada
+    name: "Bioentrada"
+    sector: "control_de_acceso_biometria_deteccion_metales"
+    base_url: "https://www.bioentrada.com"
+    active: true
+    adapter: wix_stores
+    rate_limit_seconds: 1.0
+    notes: >
+      Tienda Wix Stores. Confirmado y activo gracias al nuevo adaptador
+      genérico src/adapters/wix_stores.py (construido específicamente para
+      poder sumar este proveedor y cualquier otro futuro en Wix): se
+      enumeran las 856 URLs de producto vía
+      /store-products-sitemap.xml y se extrae cada una del bloque SSR
+      "wix-warmup-data" que Wix incrusta en cada página de producto —
+      moneda COP confirmada explícitamente ahí (campo "currency"), sin
+      ambigüedad. Es más lento que los demás adaptadores (una petición por
+      producto, con rate limit), así que puede tardar más en correr que el
+      resto de la matriz.
+
+  - code: servisistemas
+    name: "Servisistemas"
+    sector: "cableado_redes_data_center"
+    base_url: "https://servisistemas.com.co"
+    active: true
+    adapter: css
+    rate_limit_seconds: 2
+    categories:
+      - name: "Cable UTP Categoría 6"
+        start_url: "https://servisistemas.com.co/cable-utp-categoria-6"
+      - name: "Cable UTP Categoría 6A"
+        start_url: "https://servisistemas.com.co/cable-utp-categoria-6a"
+      - name: "Cable UTP Categoría 5E"
+        start_url: "https://servisistemas.com.co/cable-utp-categoria-5e"
+    selectors:
+      product_card: "article.product-miniature.js-product-miniature"
+      name: "h2.product-title a"
+      sku: "h2.product-title a"
+      price: "span.price"
+      stock_out_of_stock_text: "Agotado"
+      product_url: "h2.product-title a"
+      next_page: "a.next.js-search-link"
+    notes: >
+      Plataforma PrestaShop, especializada en cableado estructurado y
+      soluciones de data center. Confirmado vía el objeto JS "prestashop"
+      embebido en cada página: is_catalog=false, show_prices=true,
+      currency.iso_code="COP" — moneda y visibilidad de precios
+      confirmadas explícitamente, sin necesidad de login.
+
+  # --------------------------------------------------------------------
+  # CANDIDATOS PENDIENTES (investigados, aún sin activar)
+  # --------------------------------------------------------------------
+
+  - code: redatel
+    name: "Redatel"
+    sector: "seguridad_electronica"
+    base_url: "https://www.redatel.net"
+    active: false
+    adapter: css
+    categories: []
+    selectors: null
+    notes: >
+      Su página institucional no tiene catálogo propio con precios: los
+      productos que muestra son solo vitrina y enlazan a sumitelco.com
+      (agregado por separado, ver proveedor "sumitelco" más abajo). No se
+      encontró un catálogo B2B propio de Redatel con precios públicos.
+      Pendiente contactarlos directamente para lista de precios o portal
+      mayorista con login.
+
+  - code: sumitelco
+    name: "Sumitelco"
+    sector: "domotica_iot_sensores"
+    base_url: "https://sumitelco.com"
+    active: true
+    adapter: shopify
+    currency: "COP"
+    notes: >
+      Se encontró investigando Redatel (su vitrina enlaza aquí). Tienda
+      Shopify real y funcional, moneda COP confirmada. Su catálogo es de
+      domótica/IoT (sensores Tuya, controladores, cerraduras) — parcialmente
+      relevante para seguridad electrónica (sensores PIR, de puerta/ventana)
+      pero no es el catálogo B2B de cámaras/CCTV que se esperaría de
+      Redatel. Se deja activo porque son datos reales y utilizables, no
+      como reemplazo de Redatel.
+
+  - code: crc_comunicaciones
+    name: "CRC Comunicaciones"
+    sector: "radiocomunicacion"
+    base_url: "https://crccomunicaciones.com"
+    active: true
+    adapter: woocommerce
+    notes: >
+      WordPress + WooCommerce, moneda COP confirmada. El fallo inicial era
+      que el sitio bloquea el User-Agent por defecto de la librería
+      requests ("python-requests/x.x"); se resolvió agregando un
+      User-Agent de navegador real a todos los adaptadores
+      (ver src/http_utils.py). Si otro proveedor nuevo da timeout o
+      conexión rechazada, revisa esto primero antes de asumir que no
+      tiene API pública.
+
+  - code: mayorista_tecnologico
+    name: "Mayorista Tecnológico (Maitek)"
+    sector: "seguridad_electronica"
+    base_url: "https://www.mayoristatecnologico.com.co"
+    active: false
+    adapter: css
+    categories:
+      - name: "CCTV Cámaras"
+        start_url: "https://www.mayoristatecnologico.com.co/seguridad-electronica/cctv/camaras/"
+    selectors: null
+    notes: >
+      Plataforma tipo CS-Cart (no Magento/Shopify/WooCommerce). No se
+      encontró una API pública equivalente a las de GVS/SYSCOM en una
+      primera revisión. Pendiente mapear selectores CSS directamente
+      (requiere más tiempo por su estructura particular).
+
+  - code: novelec
+    name: "Novelec"
+    sector: "seguridad_electronica"
+    base_url: "https://www.gruponovelec.com"
+    active: false
+    adapter: css
+    categories: []
+    selectors: null
+    notes: >
+      Plataforma tipo Oracle ATG Commerce (rutas /_ui/...). No se encontró
+      una API pública equivalente. Pendiente mapear selectores CSS
+      directamente (requiere más tiempo por su estructura particular).
+
+  # --------------------------------------------------------------------
+  # CANDIDATOS DESCARTADOS o NO VIABLES para scraping automático
+  # (investigados en la tercera ronda; se documentan para no re-investigar
+  # lo mismo cada vez que se revise candidates.txt)
+  # --------------------------------------------------------------------
+
+  - code: colombiagps
+    name: "Colombia GPS"
+    sector: "gps_rastreo_satelital"
+    base_url: "https://colombiagps.com.co"
+    active: false
+    adapter: css
+    categories: []
+    selectors: null
+    notes: >
+      Falso positivo de WooCommerce: el HTML contiene clases CSS de
+      WooCommerce por el theme (Elementor/Divi), pero el plugin real está
+      desactivado (se confirmó "check_woocommerce_enabled":"false" en su
+      config JS). El sitio opera 100% bajo modelo "solicitar cotización",
+      sin precios públicos. No es candidato a scraping automático.
+
+  - code: rastreadoresgpscolombia
+    name: "Rastreadores GPS Colombia"
+    sector: "gps_rastreo_satelital"
+    base_url: "https://rastreadoresgpscolombia.com.co"
+    active: false
+    adapter: css
+    categories: []
+    selectors: null
+    notes: "Mismo caso que Colombia GPS: falso positivo WooCommerce (solo CSS del theme), modelo de solo cotización, sin precios públicos."
+
+  - code: zktecocolombia
+    name: "ZKTeco Colombia"
+    sector: "control_de_acceso_biometria"
+    base_url: "https://zktecocolombia.com"
+    active: false
+    adapter: css
+    categories: []
+    selectors: null
+    notes: "Mismo caso: falso positivo WooCommerce (solo CSS del theme), modelo de solo cotización, sin precios públicos."
+
+  - code: mercaelectronico
+    name: "Mercaelectronico"
+    sector: "electronica_general"
+    base_url: "https://mercaelectronico.com"
+    active: false
+    adapter: css
+    categories: []
+    selectors: null
+    notes: >
+      Plataforma PrestaShop confirmada, pero a diferencia de Servisistemas
+      esta tienda sí exige "iniciar sesión" para ver precios (login-gated).
+      No es candidato a scraping automático sin credenciales de cliente
+      mayorista. Nota: el dominio correcto es mercaelectronico.com (sin el
+      subdominio "tienda." que traía la lista original de candidatos, que
+      no resuelve por DNS).
+
+  - code: fichetcolombia
+    name: "Fichet Colombia"
+    sector: "seguridad_electronica_cajas_fuertes"
+    base_url: "https://fichetcolombia.com"
+    active: false
+    adapter: css
+    categories: []
+    selectors: null
+    notes: >
+      Sitio Wix (confirmado: wixEcom, static.wixstatic.com en el HTML),
+      pero a diferencia de Bioentrada NO tiene Wix Stores realmente
+      instalado con catálogo: su /sitemap.xml no incluye un
+      store-products-sitemap.xml (solo pages-sitemap.xml). Es un sitio de
+      solo vitrina/institucional. El adaptador wix_stores (ver
+      src/adapters/wix_stores.py) ya lo detectaría automáticamente si
+      algún día activan una tienda real -- no requiere cambios de código,
+      basta con volver a correr discover.py.
+
+  - code: ecomshops
+    name: "Ecom Shops"
+    sector: "cerraduras_inteligentes"
+    base_url: "https://www.ecomshops.com.co"
+    active: false
+    adapter: css
+    categories: []
+    selectors: null
+    notes: >
+      WordPress, pero sin el plugin WooCommerce activo (la ruta
+      /wp-json/wc/store/v1/products responde 404 "rest_no_route"). No se
+      identificó plataforma de e-commerce ni precios públicos en la home.
+      Pendiente revisar páginas de producto directamente por si usa un
+      plugin de catálogo distinto, o si es solo vitrina con cotización.
+
+  - code: telavip
+    name: "Telavip"
+    sector: "telecomunicaciones_alarmas_cctv"
+    base_url: "https://www.telavip.com.co"
+    active: false
+    adapter: css
+    categories: []
+    selectors: null
+    notes: "Mismo caso que Ecom Shops: WordPress sin WooCommerce activo, sin precios públicos identificados en la home. Pendiente revisar páginas de producto."
+
+  - code: batterypower
+    name: "Battery Power"
+    sector: "energia_ups_baterias"
+    base_url: "https://batterypower.com.co"
+    active: false
+    adapter: css
+    categories: []
+    selectors: null
+    notes: "Mismo caso: WordPress sin WooCommerce activo. Pendiente revisar páginas de producto por si usa otro plugin o modelo de cotización."
+
+  - code: vzlatam
+    name: "VZ Latam"
+    sector: "desconocido"
+    base_url: "https://vzlatam.com"
+    active: false
+    adapter: css
+    categories: []
+    selectors: null
+    notes: "Dominio no resuelve (NXDOMAIN confirmado con nslookup). Parece expirado/dado de baja. Descartado."

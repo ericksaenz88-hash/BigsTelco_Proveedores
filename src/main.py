@@ -9,6 +9,7 @@ Uso:
 Pensado para ejecutarse:
   - manualmente durante desarrollo/pruebas
   - automáticamente cada día vía GitHub Actions (ver .github/workflows/daily_update.yml)
+  - automáticamente cada día en el PC del usuario (ver scripts/run_daily.ps1)
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ from dotenv import load_dotenv
 
 from src import db
 from src.scraper import scrape_provider
+from src.unit_extractor import extract_unit
 
 logging.basicConfig(
     level=logging.INFO,
@@ -105,6 +107,11 @@ def run_provider(conn, provider_cfg: dict, dry_run: bool = False) -> int:
 
     seen_skus = []
     for p in products:
+        # Si el adaptador no trae la unidad de venta explícita, se intenta
+        # deducir del nombre del producto (ver src/unit_extractor.py).
+        # Nunca sobrescribe un valor que el adaptador sí haya traído.
+        unit = p.unit or extract_unit(p.name)
+
         db.upsert_product_and_price(
             conn,
             provider_id=provider_id,
@@ -114,7 +121,7 @@ def run_provider(conn, provider_cfg: dict, dry_run: bool = False) -> int:
             brand=p.brand,
             url=p.url,
             image_url=p.image_url,
-            unit=p.unit,
+            unit=unit,
             price=p.price,
             currency=p.currency,
             in_stock=p.in_stock,

@@ -13,18 +13,24 @@
 # Todo el output queda registrado en logs/ con fecha, para poder revisar si
 # algo falló sin tener que estar mirando la pantalla.
 #
-# NOTA IMPORTANTE sobre $ErrorActionPreference: se deja en "Continue" (el
-# valor por defecto de PowerShell) alrededor de las llamadas a Python, y NO
-# en "Stop". Si se pone en "Stop" y se redirige stderr de un programa externo
-# a un archivo (como hacemos con *>>), PowerShell trata CUALQUIER línea que
-# Python escriba en stderr -- incluyendo sus logs normales de nivel INFO,
-# que Python manda a stderr por defecto -- como un error fatal y corta el
-# script, aunque Python no haya fallado en absoluto. En su lugar, revisamos
-# $LASTEXITCODE después de cada llamada para saber si de verdad falló.
+# Si algo falla, se muestra una notificación emergente de Windows (ver
+# lib_alertas.ps1) para que te enteres sin tener que revisar el log a mano.
+#
+# NOTA IMPORTANTE sobre $ErrorActionPreference: se deja en el valor por
+# defecto de PowerShell ("Continue") alrededor de las llamadas a Python, y
+# NO en "Stop". Si se pone en "Stop" y se redirige stderr de un programa
+# externo a un archivo (como hacemos con *>>), PowerShell trata CUALQUIER
+# línea que Python escriba en stderr -- incluyendo sus logs normales de
+# nivel INFO, que Python manda a stderr por defecto -- como un error fatal
+# y corta el script, aunque Python no haya fallado en absoluto. En su lugar,
+# revisamos $LASTEXITCODE después de cada llamada para saber si de verdad
+# falló.
 # ============================================================================
 
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $ProjectRoot
+
+. (Join-Path $PSScriptRoot "lib_alertas.ps1")
 
 $Today = Get-Date -Format "yyyy-MM-dd"
 $MarkerFile = Join-Path $PSScriptRoot ".last_run"
@@ -55,12 +61,14 @@ $Python = if (Test-Path $VenvPython) { $VenvPython } else { "python" }
 Log "Usando Python: $Python"
 
 $HadError = $false
+$ErrorDetails = @()
 
 Log "--- Paso 1: descubrimiento de proveedores nuevos (src.discover) ---"
 & $Python -m src.discover *>> $LogFile
 if ($LASTEXITCODE -ne 0) {
     Log "!!! src.discover terminó con código $LASTEXITCODE (revisa el log de arriba para el detalle)"
     $HadError = $true
+    $ErrorDetails += "Descubrimiento de proveedores (src.discover) falló con código $LASTEXITCODE"
 }
 
 Log "--- Paso 2: actualización de precios (src.main) ---"
@@ -68,10 +76,14 @@ Log "--- Paso 2: actualización de precios (src.main) ---"
 if ($LASTEXITCODE -ne 0) {
     Log "!!! src.main terminó con código $LASTEXITCODE (revisa el log de arriba para el detalle)"
     $HadError = $true
+    $ErrorDetails += "Actualización de precios (src.main) falló con código $LASTEXITCODE"
 }
 
 if ($HadError) {
     Log "=== Corrida diaria terminó CON ERRORES (ver detalle arriba) ==="
+    Show-Alert -Titulo "Bigs Telco - Error en actualización de precios" `
+               -Mensaje ("$($ErrorDetails -join '; '). Revisa el log: $LogFile") `
+               -Tipo "Error"
     # No se actualiza el marcador .last_run si falló, para que el próximo
     # logon del mismo día vuelva a intentarlo.
     exit 1
